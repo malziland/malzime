@@ -129,6 +129,31 @@ describe("Live-Anzeige (v3.0)", () => {
     frisch.zuruecksetzen();
   });
 
+  it("Der Server-Anlauf des Modells gilt (Large 3: 25 s) — bei 24 s tippt noch nichts, kurz danach schon", async () => {
+    vi.resetModules();
+    const frisch = await import("../js/live-anzeige.js");
+    const { elements: el } = await import("../js/dom.js");
+    frisch.welle({ standard: "A".repeat(2000), beast: null, tippAnlaufMs: 25000 });
+    await vi.advanceTimersByTimeAsync(24000);
+    expect(el.liveTextFest.textContent.length).toBe(0);
+    await vi.advanceTimersByTimeAsync(1500);
+    expect(el.liveTextFest.textContent.length).toBeGreaterThan(0);
+    frisch.zuruecksetzen();
+  });
+
+  it.each([[undefined], [-1], [Number.NaN], [600000], ["25000"]])(
+    "unplausibler Server-Anlauf %s -> es gilt der Standard von 2 s",
+    async (wert) => {
+      vi.resetModules();
+      const frisch = await import("../js/live-anzeige.js");
+      const { elements: el } = await import("../js/dom.js");
+      frisch.welle({ standard: "A".repeat(2000), beast: null, tippAnlaufMs: wert });
+      await vi.advanceTimersByTimeAsync(3400);
+      expect(el.liveTextFest.textContent.length).toBeGreaterThan(0);
+      frisch.zuruecksetzen();
+    }
+  );
+
   it("Adaptives Tempo: viel Puffer tippt am Deckel (~90 Z/s) — deutlich schneller als das alte Festtempo", async () => {
     /* Riesiger Rest → das Tempo läuft an den Deckel MAX_ZEICHEN_PRO_SEKUNDE.
        Diese Probe wird ROT, wenn jemand das feste 70-Z/s-Tempo zurückbaut. */

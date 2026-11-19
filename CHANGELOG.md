@@ -16,6 +16,10 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 - **Die Wartezeit-Ansage rechnet ohne Messwerte mit der Dauer des eingestellten
   Modells** (bei Large 3 rund 40 statt 80 Sekunden), und die Statistik-Schnittstelle
   meldet die Zeitgrenze, die wirklich gilt (bei Large 3 300 statt 410 Sekunden).
+- **Die Live-Anzeige beginnt zu tippen, wie es zum Modell passt.** Mit Large 3 wartet
+  sie wieder 25 Sekunden, bevor sie tippt (wie bis 01.11.2026), mit Large 4 zwei
+  Sekunden. Vorher galten die zwei Sekunden von Large 4 für jedes Modell, und bei
+  Large 3 kroch das Tippen dem Text hinterher.
 
 - **Die Analyse ist wieder rund viermal so schnell: Es rechnet wieder Mistral Large 3
   statt Large 4.** Seit dem 17.11. brauchte Large 4 bei Mistral deutlich länger; am

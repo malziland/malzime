@@ -20,6 +20,7 @@
 
 const { randomUUID } = require("crypto");
 const { geltendeWerte } = require("./betriebsprofil");
+const { MISTRAL_MODEL, modellEinstellungen } = require("./config");
 const { dauerJeAnalyse } = require("./durchsatz");
 const { wartezeitSekunden } = require("./warteschlangen-rechnung");
 const { getFeatureFlags } = require("./feature-flags");
@@ -217,6 +218,10 @@ async function beantworte(req, res) {
          ihn derzeit nicht aus (Teil des Live-Text-Protokolls, für Reihenfolge/
          Debugging reserviert) — bewusst mitgegeben und getestet, kein toter Rest. */
       antwort.liveTextStand = typeof job.liveTextStand === "number" ? job.liveTextStand : null;
+      /* Tipp-Anlauf des gewaehlten Modells (config.js, MODELL_EINSTELLUNGEN):
+         Der Browser kennt das Modell nicht, der Anlauf haengt aber daran. */
+      const { modell } = await geltendeWerte();
+      antwort.tippAnlaufMs = modellEinstellungen(modell || MISTRAL_MODEL).tippAnlaufMs;
       /* Neuversuch nach Verbindungsabriss (01.10.2026, jobs.setLiveText): Steigt
          die Zahl, faengt die Live-Anzeige von vorn an; eine kleinere ist eine
          verspaetete Welle der verworfenen Antwort. */

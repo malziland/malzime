@@ -610,8 +610,10 @@ Large 4 140 bis 188 s, Ergebnis gleichwertig. Large 4 traf in der Messung vom
 `mistral-large-4` (Large 4). Jedes bringt dort seine Grenzen mit und sie
 wechseln mit: wie lange ein Analyse-Aufruf laufen darf (Large 3 300 s, Large 4
 200 s mit einem zweiten Versuch), wie viel Text es mindestens braucht, die
-Grenzen des Werbe-Aufrufs, der Nachdenk-Zusatz von Large 4 und der Faktor für
-die geschätzte Wartezeit, solange keine gemessene Dauer vorliegt. Der
+Grenzen des Werbe-Aufrufs, der Nachdenk-Zusatz von Large 4, der Faktor für
+die geschätzte Wartezeit, solange keine gemessene Dauer vorliegt, und der
+Anlauf des Tippens in der Live-Anzeige (Large 3 25 s, Large 4 2 s; der Server
+schickt ihn mit dem Auftragsstatus an den Browser). Der
 produktive Satz passt zu beiden Modellen (geprüft in
 `betriebsprofil-kopplung.test.js` und vom Anlege-Skript). Ein nicht erlaubtes
 Modell oder ein Satz, der nicht zum Modell passt, legt den Satz still — dann

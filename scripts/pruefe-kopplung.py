@@ -284,7 +284,9 @@ ABHAENGIGKEITS_GRENZEN = {
     # ANGEHOBEN 19.11.2026 von 14 auf 15: durchsatz.js und handle-stats.js
     # brauchen die Werte des gewaehlten Modells (Ersatz-Wartezeit, wirksame
     # Zeitgrenze). Sie fragen danach, statt sie durchgereicht zu bekommen.
-    "config": 15,
+    # ANGEHOBEN 19.11.2026 auf 16: handle-job-status.js schickt den Tipp-Anlauf
+    # des gewaehlten Modells an den Browser (MODELL_EINSTELLUNGEN).
+    "config": 16,
     # ANGEHOBEN 16.10.2026 von 10 auf 13: db.js ist mit Absicht die EINZIGE
     # Stelle, an der eine Datenbankverbindung entsteht (db-zentral.test.js).
     # Wer eine eigene Sammlung oder Marke schreibt (statistik.js,

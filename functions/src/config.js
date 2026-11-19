@@ -124,6 +124,7 @@ const MISTRAL_MODEL = "mistral-large-2512";
      mindestAusgabeToken  so viel Text muss der Einstellungssatz diesem Modell
                           mindestens erlauben (singleLargeMaxTokens)
      dauerFaktor          Ersatz-Wartezeit ohne Messung (siehe unten)
+     tippAnlaufMs         Anlauf des Tippens in der Live-Anzeige (Browser)
    Der Einstellungssatz in Firestore haelt Werte, die fuer JEDES Modell hier
    passen; das prueft betriebsprofil-kopplung.test.js am produktiven Satz.
    Beim Lesen aus Firestore prueft betriebsprofil-kopplung.js den Satz gegen
@@ -140,12 +141,11 @@ const MODELL_EINSTELLUNGEN = {
     werbeZeitgrenzeMs: 30_000,
     analyseZeitgrenzeMs: 300_000,
     mindestAusgabeToken: 5000,
-    /* Ersatz-Wartezeit = durchschnittsdauerSekunden des Satzes × dauerFaktor,
-       nur solange keine gemessene Dauer vorliegt (durchsatz.js). Der Satz
-       traegt 80 s, gemessen an Large 4 (31.10.2026); Large 3 brauchte am
-       19.11.2026 37–39 s, also die Haelfte. Der Faktor sitzt hier und nicht
-       im Satz, damit derselbe Satz fuer beide Modelle gilt. */
+    /* Satz traegt 80 s (Large 4); Large 3 am 19.11.2026: 37–39 s. Der Faktor
+       steht hier, damit derselbe Satz fuer beide Modelle gilt (durchsatz.js). */
     dauerFaktor: 0.5,
+    /* Anlauf bis 01.11.2026, abgenommen im Live-Test 11.08.2026. */
+    tippAnlaufMs: 25_000,
   },
   /* Lasttest 31.10.2026, 30 zugleich: Fertige Analysen brauchten bis 170 s, zwei
      hingen bis zur Zeitgrenze von 280 s, dieselben Fotos liefen sonst durch.
@@ -160,8 +160,8 @@ const MODELL_EINSTELLUNGEN = {
     /* Das Nachdenken zaehlt zu den Antwort-Token: 31.10.2026 rund 10.500 je
        Analyse, Spitze 15.500; 19.11.2026 bis 12.100. */
     mindestAusgabeToken: 16000,
-    /* Der Satzwert 80 s ist an Large 4 gemessen (31.10.2026). */
-    dauerFaktor: 1,
+    dauerFaktor: 1 /* Satzwert 80 s ist an Large 4 gemessen */,
+    tippAnlaufMs: 2000 /* Text kommt erst kurz vor Schluss (01.11.2026) */,
   },
 };
 /* Die erlaubten Modelle — genau die mit eigenen Einstellungen oben. */

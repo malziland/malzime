@@ -60,6 +60,30 @@ beforeEach(() => {
   jobs.markDelivered.mockResolvedValue();
 });
 
+describe("handleJobStatus — Tipp-Anlauf haengt am gewaehlten Modell (19.11.2026)", () => {
+  const betriebsprofil = require("../betriebsprofil");
+  afterEach(() => betriebsprofil._setzeModell(null));
+
+  test.each([
+    [null, 25000, "ohne Feld modell gilt config.js (Large 3)"],
+    ["mistral-large-2512", 25000, "Large 3"],
+    ["mistral-large-4", 2000, "Large 4"],
+  ])("modell %s -> tippAnlaufMs %i (%s)", async (modell, erwartet) => {
+    betriebsprofil._setzeModell(modell);
+    jobs.getJob.mockResolvedValue(PROCESSING_JOB);
+    const res = makeRes();
+    await handleJobStatus(reqMit("Aa1Bb2Cc3Dd4Ee5Ff6Gg", "ticket-abc"), res);
+    expect(res.body.tippAnlaufMs).toBe(erwartet);
+  });
+
+  test("ohne Ticket kein Anlauf (kein Live-Text, nichts zu tippen)", async () => {
+    jobs.getJob.mockResolvedValue(PROCESSING_JOB);
+    const res = makeRes();
+    await handleJobStatus(reqMit("Aa1Bb2Cc3Dd4Ee5Ff6Gg"), res);
+    expect(res.body.tippAnlaufMs).toBeUndefined();
+  });
+});
+
 describe("handleJobStatus — Live-Text bei processing", () => {
   test("mit richtigem Ticket kommen liveText und liveTextStand mit", async () => {
     jobs.getJob.mockResolvedValue(PROCESSING_JOB);

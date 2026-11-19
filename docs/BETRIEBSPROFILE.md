@@ -53,7 +53,7 @@ nur die Modelle mit eigenen Einstellungen in `functions/src/config.js`
 (`MODELL_EINSTELLUNGEN`, heute Large 3 und Large 4); jeder andere Wert legt den
 Satz still. Fehlt das Feld, gilt die Vorgabe `MISTRAL_MODEL` aus `config.js`.
 Der aktive Satz muss zum gewählten Modell passen (genug Text), sonst wird er
-abgelehnt. Zeitgrenze des Aufrufs, Werbe-Aufruf und Ersatz-Wartezeit wechseln
+abgelehnt. Zeitgrenze des Aufrufs, Werbe-Aufruf, Ersatz-Wartezeit und Tipp-Anlauf wechseln
 mit dem Modell. Umgeschaltet wird mit `scripts/modell-umschalten.js`, das vor
 dem Schreiben beides prüft (`docs/RUNBOOK.md`, Abschnitt 3c). Der Abgleich vor
 der Auslieferung duldet jedes erlaubte Modell: Es ist ein Schalter für den

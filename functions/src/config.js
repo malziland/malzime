@@ -102,14 +102,11 @@ const ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp", "image/gif"];
    Mistral koennte das -latest-Alias jederzeit auf eine neuere Version
    umlenken, deren Konditionen wir nicht kennen. Mit dem Pin kontrollieren
    wir Versions-Wechsel selbst. (Zu Rate-Limits: Stufen-System, s. oben.) */
-/* DIE VORGABE — gilt, solange das Feld `modell` im Einstellungssatz fehlt.
-   Seit 19.11.2026 (Vorgabe Christoph) waehlt dieses Feld das Modell im
-   Betrieb, ohne Auslieferung (betriebsprofil.js, scripts/modell-umschalten.js).
-   Gewaehlt werden kann NUR, was unten in MODELL_EINSTELLUNGEN steht
-   (ERLAUBTE_MODELLE) — ein neues Modell braucht also weiterhin Code, Messung
-   und Auslieferung. Die Rechtstexte nennen „Mistral Large, in der EU“, das
-   deckt beide. Welches Modell rechnete, steht im Protokoll jeder Analyse
-   (mistral-single-large-details, Feld model) und in /api/stats. */
+/* DIE VORGABE, solange das Feld `modell` im Einstellungssatz fehlt. Seit
+   19.11.2026 waehlt dieses Feld das Modell im Betrieb (betriebsprofil.js,
+   scripts/modell-umschalten.js) — NUR aus MODELL_EINSTELLUNGEN unten; ein
+   neues Modell braucht weiterhin Code, Messung und Auslieferung. Sichtbar im
+   Protokoll jeder Analyse (Feld model) und in /api/stats. */
 const MISTRAL_MODEL = "mistral-large-2512";
 /* BLEIBT IM CODE — was je Modell am Aufruf anders ist, an einer Stelle.
    Large 4 denkt vor jeder Antwort nach, und das Nachdenken zaehlt zu den

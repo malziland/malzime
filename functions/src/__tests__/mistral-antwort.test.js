@@ -120,11 +120,13 @@ describe("ohneWerbeAbsagen — eine Absage der KI wird nie ein Werbe-Kaertchen",
 describe("modellEinstellungen — was je Modell am Aufruf anders ist", () => {
   const { modellEinstellungen } = require("../config");
 
-  test("Large 3 bleibt unveraendert", () => {
+  test("Large 3 ruft ohne Zusatz auf und traegt seit 19.11.2026 seine eigenen Grenzen", () => {
     expect(modellEinstellungen("mistral-large-2512")).toEqual({
       aufrufZusatz: {},
       werbeMaxTokens: 600,
       werbeZeitgrenzeMs: 30_000,
+      analyseZeitgrenzeMs: 300_000,
+      mindestAusgabeToken: 5000,
     });
   });
 

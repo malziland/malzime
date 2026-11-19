@@ -586,9 +586,14 @@ wird auch sein schon gelesener Text gerettet, wenn er abreißt. Vorher lief der
 Neuversuch ohne Live-Text; der halbe alte Text blieb rund 40 Sekunden stehen
 und wurde am Ende durch das Ergebnis einer anderen Modellantwort ersetzt.
 
-Gehäufte Abrisse zählt die log-basierte Metrik `ki_verbindungsabriss`; mehr als
-drei in 24 Stunden lösen den Alarm „KI-Verbindung bricht gehäuft ab“ aus — auch
-wenn jeder Neuversuch gelang.
+Gehäufte Neuversuche zählt die log-basierte Metrik `ki_verbindungsabriss`; mehr
+als drei in 24 Stunden lösen den Alarm „KI-Verbindung bricht gehäuft ab“ aus —
+auch wenn jeder Neuversuch gelang. Die Metrik zählt jede Zeile
+`abbruch-neuversuch`, also auch den Neuversuch nach der Zeitgrenze, den es nur
+bei Large 4 gibt. Am 18.11.2026 war jede der 23 Zeilen eine Zeitgrenze, kein
+Abriss; seitdem heißt der Betreff der Nachricht „Mistral bricht ab oder
+antwortet zu langsam“ (docs/ERROR-ALERTING.md), der Name der Regel blieb, weil
+die Infrastrukturprüfung sie daran erkennt.
 
 **Begründung.** Am 01.10.2026 scheiterten 2 von 30 Analysen eines Workshops an
 einem Abriss; beide Kinder sahen sofort die Fehlermeldung. Ein Neuversuch kostet
@@ -2102,3 +2107,52 @@ durchlässt, wenn ein Ergebnis für ein Kind eine Stelle aus einer Vorlage
 übernimmt, oder wenn
 das Mistral-Dashboard nach der Auslieferung deutlich höhere Kosten je Analyse
 zeigt.
+
+## Mistral-Modell: zurück auf Large 3, Grenzen am Modell (19.11.2026)
+
+**Entscheidung.** Seit 19.11.2026 rechnet wieder `mistral-large-2512` (Large 3)
+statt `mistral-large-4` (Large 4, seit 01.11.2026). Was vom Modell abhängt —
+Zeitgrenze des Analyse-Aufrufs, Mindest-Textmenge, Grenzen des Werbe-Aufrufs,
+Nachdenk-Zusatz —, steht je Modell in `MODELL_EINSTELLUNGEN`
+(`functions/src/config.js`) und wechselt mit der einen Zeile `MISTRAL_MODEL`.
+Der Einstellungssatz in Firestore hält Werte, die für beide Modelle passen
+(geprüft in `betriebsprofil-kopplung.test.js`); beim Lesen prüft
+`betriebsprofil-kopplung.js` den Satz gegen das eingestellte Modell und lehnt
+ihn ab, wenn er dem Modell zu wenig Text erlaubt.
+
+**Begründung.** Ab 17.11.2026 wurde Large 4 bei Mistral langsam: Am 18.11.
+brauchte eine fertige Analyse im Median 184 s (vom 06. bis 13.11. 95 bis 147 s),
+23 Aufrufe liefen in die Zeitgrenze von 200 s, 15 von 82 Analysen scheiterten.
+Mistral meldete für das Modell keine Störung. Der Vergleich am 19.11.2026
+(Café-Demofoto, unser Analyse-Auftrag, je drei Läufe beider Modelle
+gleichzeitig): Large 3 37 bis 39 s und rund 2.800 Ausgabe-Token, Large 4 140
+bis 188 s und 9.500 bis 12.100 Token (das Nachdenken, das sich bei Large 4
+nicht abschalten lässt); Altersangabe und Vollständigkeit gleich. Der
+Werbe-Aufruf mit Large 3 lieferte in 4 von 4 Läufen (Erwachsene und Kind) die
+volle Liste in 3 bis 4 s.
+
+**Datenschutz und Zusagen.** Website und Datenschutzerklärung nennen „Mistral
+Large, in der EU“ bzw. Mistral AI als Auftragsverarbeiter, keine Modellfassung
+— beides gilt für Large 3 wie für Large 4 (Suche am 19.11.2026: `git grep -n -i
+-E "large[- ]?4|large-2512|large 3|mistral large"` findet in `public/` nur die
+Kurzvorstellung DE/EN mit „Mistral Large“). Die Zusage, dass Mistral Ein- und
+Ausgaben nicht speichert, gilt für die ganze Organisation, nicht je Modell. Large 3
+lief bis 01.11.2026 mit genau diesen Zusagen. Keine Änderung an Rechtstexten nötig.
+
+**Preis.** Large 4 traf in der Messung vom 31.10.2026 das Alter Erwachsener
+besser. Mit Large 3 kommt die frühere Genauigkeit zurück.
+
+**Betrachtete Alternativen.** (1) Bei Large 4 bleiben und die Zeitgrenze
+anheben: verworfen — der Neuversuch hatte schon 200 s, die Kinder warteten
+dann noch länger. (2) Das Modell sofort per Firestore umschaltbar machen:
+gewünscht, als eigene Änderung vorgesehen (nur zwischen den erlaubten Modellen,
+mit dem Modell im Protokoll jeder Analyse); für die Rückkehr heute zu langsam.
+(3) Die Betriebswerte im Satz je Modell umschalten (gleichzeitige Analysen,
+Textmenge): verworfen — die Bremse gegen Mistrals Grenze ist die Rate der
+Warteschlange, die für beide Modelle gilt, und ein Satz für beide erspart den
+Schritt in Firestore, der sich mit der Auslieferung nicht gleichzeitig machen lässt.
+
+**Bedingung für Neubewertung.** Large 3 wird am 30.04.2027 abgeschaltet; vorher
+muss ein Nachfolger gemessen und eingestellt sein. Außerdem: Large 4 wieder
+messbar schnell (Median unter 120 s über einen Workshop-Tag), oder die
+Alters-Messung zeigt mit Large 3 Fehlschätzungen, die Large 4 vermeiden würde.

@@ -131,11 +131,15 @@ Alle drei Arten des Scheiterns zählt die Werbe-Wache; dauert es zu lange, kommt
 der Push „Beast-Werbung fällt aus“ (unten).
 
 Dazu kommt eine Schwellen-Richtlinie (wie die für Browser-Fehler unten):
-`malziME KI-Verbindung bricht gehäuft ab` — Betreff „malziME: KI-Verbindung bricht
-gehäuft ab (mehr als 3 Neuversuche an einem Tag)“, zählt die log-basierte Metrik
-`ki_verbindungsabriss` (Filter: Dienst `processjob`,
-`jsonPayload.status="abbruch-neuversuch"`) über 24 Stunden. Sie meldet gehäufte
-Abrisse auch dann, wenn jeder Neuversuch gelang.
+`malziME KI-Verbindung bricht gehäuft ab` — Betreff „malziME: Mistral bricht ab
+oder antwortet zu langsam (mehr als 3 Neuversuche an einem Tag)“ (seit
+19.11.2026; der Name der Regel blieb, die Infrastrukturprüfung erkennt sie
+daran), zählt die log-basierte Metrik `ki_verbindungsabriss` (Filter: Dienst
+`processjob`, `jsonPayload.status="abbruch-neuversuch"`) über 24 Stunden. Sie
+meldet gehäufte Neuversuche auch dann, wenn jeder gelang. Gezählt wird ein
+Abriss der Verbindung und — nur bei Large 4 — die Zeitgrenze ohne Antwort;
+welches von beiden, zeigt das Feld `error` (docs/RUNBOOK.md, „Verbindungsabriss“).
+Am 18.11.2026 waren alle 23 Neuversuche Zeitgrenzen.
 
 **Absagen der KI: erst gehäuft (seit 13.11.2026).** Schreibt die KI zu einem
 Foto kein Profil, auch nicht auf die Nachfrage (`blocked.profileBlocked`: meist

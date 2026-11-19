@@ -92,26 +92,39 @@ describe("Rettung eines abgebrochenen Single-Large-Laufs", () => {
     expect(ergebnis.boost.profileText).toContain("wanderst");
   });
 
-  /* Der seriöse Text steht hinter den Karten: Reisst die Uhr in beiden Versuchen
-     davor, zaehlen die Karten. Im ersten Versuch wird neu versucht. */
-  test("bricht auch der zweite Versuch vor dem Text ab, bleiben die Karten", async () => {
+  /* Der seriöse Text steht hinter den Karten: Reisst die Uhr davor, zaehlen die
+     Karten. Ob nach der Zeitgrenze erst neu gefragt wird, haengt am Modell
+     (config.js, neuversuchBeiZeitgrenze): Large 4 fragt einmal neu, Large 3
+     nicht. Beide Wege werden geprueft, weil der Rueckweg auf das jeweils andere
+     Modell nur eine Zeile ist (seit 19.11.2026 rechnet wieder Large 3). */
+  test.each([
+    ["mistral-large-4", 3, "Versuch, Neuversuch und die Nachfrage nach den uebrigen Karten"],
+    ["mistral-large-2512", 2, "Versuch und die Nachfrage, kein Neuversuch nach der Zeitgrenze"],
+  ])("%s: bricht der Versuch vor dem Text ab, bleiben die Karten (%i Aufrufe: %s)", async (modell, erwartet) => {
+    let m;
+    jest.isolateModules(() => {
+      jest.doMock("../config", () => ({ ...jest.requireActual("../config"), MISTRAL_MODEL: modell }));
+      m = require("../mistral");
+    });
     const nurKarten = JSON.stringify({
       subject: "HUMAN",
       standard: { categories: { alter_geschlecht: { value: "Du bist 40." } } },
     }).slice(0, -2);
     let aufrufe = 0;
-    setFetchForTest(async () => {
+    m.setFetchForTest(async () => {
       aufrufe += 1;
       return sseStromDerAbbricht(nurKarten);
     });
-
-    const ergebnis = await runSingleLargeCall(Buffer.from("bild"), "image/jpeg", () => 999_999, "de", {
-      onLiveText: () => {},
-    });
-
-    /* Versuch, Neuversuch und die Nachfrage nach den uebrigen Karten. */
-    expect(aufrufe).toBe(3);
-    expect(ergebnis.normal.categories.alter_geschlecht.value).toContain("40");
+    try {
+      const ergebnis = await m.runSingleLargeCall(Buffer.from("bild"), "image/jpeg", () => 999_999, "de", {
+        onLiveText: () => {},
+      });
+      expect(aufrufe).toBe(erwartet);
+      expect(ergebnis.normal.categories.alter_geschlecht.value).toContain("40");
+    } finally {
+      m.setFetchForTest(null);
+      jest.dontMock("../config");
+    }
   });
 
   test("reicht die Zeit nicht fuer einen zweiten Versuch, bleiben die Karten sofort", async () => {

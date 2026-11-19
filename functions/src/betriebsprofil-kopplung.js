@@ -14,7 +14,7 @@
  */
 
 /* Das gemessene Schreibtempo der KI — ein Messergebnis, kein Sollwert. */
-const { MISTRAL_SLOWEST_TOKENS_PER_SECOND } = require("./config");
+const { MISTRAL_SLOWEST_TOKENS_PER_SECOND, MISTRAL_MODEL, modellEinstellungen } = require("./config");
 
 /* Obergrenze, die Google der Function gibt. Kein Profil darf darueber. */
 const FUNCTION_LIMIT_MS = 540 * 1000;
@@ -54,6 +54,18 @@ function pruefeKopplungen(werte) {
       `singleLargeMaxTokens (${werte.singleLargeMaxTokens}) braucht bei ` +
       `${MISTRAL_SLOWEST_TOKENS_PER_SECOND} Token/s ${Math.round(brauchtSekunden)} s, ` +
       `singleLargeTimeoutMs erlaubt aber nur ${Math.round(werte.singleLargeTimeoutMs / 1000)} s`
+    );
+  }
+  /* Der Satz muss dem eingestellten Modell genug Text erlauben (19.11.2026).
+     Large 4 schreibt mit dem Nachdenken bis rund 15.500 Token; ein Satz fuer
+     Large 3 (5000) schnitte seine Antworten still ab. Lieber den Satz ablehnen
+     — dann meldet sich die satzWache — als halbe Profile ausliefern. Was je
+     Modell gilt, steht in config.js (MODELL_EINSTELLUNGEN). */
+  const modell = modellEinstellungen(MISTRAL_MODEL);
+  if (modell.mindestAusgabeToken && werte.singleLargeMaxTokens < modell.mindestAusgabeToken) {
+    return (
+      `singleLargeMaxTokens (${werte.singleLargeMaxTokens}) ist fuer ${MISTRAL_MODEL} zu klein — ` +
+      `das Modell braucht mindestens ${modell.mindestAusgabeToken} (config.js, MODELL_EINSTELLUNGEN)`
     );
   }
   /* Jede Einzelgrenze unter dem Gesamtbudget. */

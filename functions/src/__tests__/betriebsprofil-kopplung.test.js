@@ -117,3 +117,57 @@ describe("die ausgelieferten Saetze bestehen weiter", () => {
     expect(_pruefe(SATZ)).toBeNull();
   });
 });
+
+/* MODELL UND EINSTELLUNGSSATZ SIND VERKNUEPFT (19.11.2026). Was vom Modell
+   abhaengt, steht in config.js neben dem Modellnamen; der Satz in Firestore
+   haelt Werte, die fuer jedes erlaubte Modell passen. Ein Modellwechsel ist
+   damit eine Zeile, und keiner der Werte kann dabei vergessen werden. */
+describe("Modell und Einstellungssatz passen zusammen", () => {
+  const { ERLAUBTE_MODELLE, MISTRAL_MODEL, modellEinstellungen } = require("../config");
+
+  function pruefeMitModell(modell, werte) {
+    let ergebnis;
+    jest.isolateModules(() => {
+      jest.doMock("../config", () => ({ ...jest.requireActual("../config"), MISTRAL_MODEL: modell }));
+      ergebnis = require("../betriebsprofil")._pruefe(werte);
+    });
+    jest.dontMock("../config");
+    return ergebnis;
+  }
+
+  test("das eingestellte Modell ist eines der erlaubten, und es sind genau Large 3 und Large 4", () => {
+    expect(ERLAUBTE_MODELLE).toEqual(["mistral-large-2512", "mistral-large-4"]);
+    expect(ERLAUBTE_MODELLE).toContain(MISTRAL_MODEL);
+  });
+
+  test("jedes erlaubte Modell bringt seine eigene Zeitgrenze und Mindest-Textmenge mit", () => {
+    for (const modell of ERLAUBTE_MODELLE) {
+      expect(modellEinstellungen(modell).analyseZeitgrenzeMs).toBeGreaterThan(0);
+      expect(modellEinstellungen(modell).mindestAusgabeToken).toBeGreaterThan(0);
+    }
+  });
+
+  test.each(ERLAUBTE_MODELLE.flatMap((m) => Object.keys(PROFILE).map((p) => [p, m])))(
+    "der produktive Satz %s passt zu %s (Wechsel ohne Firestore-Aenderung)",
+    (profil, modell) => {
+      expect(pruefeMitModell(modell, PROFILE[profil])).toBeNull();
+    }
+  );
+
+  test.each([
+    ["mistral-large-2512", 5000],
+    ["mistral-large-4", 16000],
+  ])("%s: genau %i Token gelten, einer weniger wird abgelehnt", (modell, grenze) => {
+    expect(pruefeMitModell(modell, { ...T1_NORMAL, singleLargeMaxTokens: grenze })).toBeNull();
+    expect(pruefeMitModell(modell, { ...T1_NORMAL, singleLargeMaxTokens: grenze - 1 })).toMatch(
+      new RegExp(`singleLargeMaxTokens \\(${grenze - 1}\\) ist fuer ${modell} zu klein`)
+    );
+  });
+
+  test("der Analyse-Aufruf nimmt die kleinere Zeitgrenze aus Satz und Modell", () => {
+    const quelle = fs.readFileSync(path.join(__dirname, "..", "mistral.js"), "utf8");
+    expect(quelle).toMatch(
+      /timeoutCapMs:\s*Math\.min\(\s*betriebswerte\.singleLargeTimeoutMs,\s*modellEinstellungen\(MISTRAL_MODEL\)\.analyseZeitgrenzeMs/
+    );
+  });
+});

@@ -4,7 +4,7 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
-## [5.5.0] — 2026-11-19
+## [Unveröffentlicht]
 
 ### Geändert
 
@@ -20,6 +20,10 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   sie wieder 25 Sekunden, bevor sie tippt (wie bis 01.11.2026), mit Large 4 zwei
   Sekunden. Vorher galten die zwei Sekunden von Large 4 für jedes Modell, und bei
   Large 3 kroch das Tippen dem Text hinterher.
+
+## [5.5.0] — 2026-11-19
+
+### Geändert
 
 - **Die Analyse ist wieder rund viermal so schnell: Es rechnet wieder Mistral Large 3
   statt Large 4.** Seit dem 17.11. brauchte Large 4 bei Mistral deutlich länger; am

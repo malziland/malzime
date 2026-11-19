@@ -552,8 +552,9 @@ meldet in den Kopfzeilen jeder Antwort **30 Aufrufe je Minute** (gemessen
 31.10.2026, `x-ratelimit-limit-req-minute`). Jede Analyse macht zwei Aufrufe
 (Analyse + Beast-Werbung), also wären 15 Analysen je Minute die Kante. Die Queue
 schickt höchstens **0,2 Analysen pro Sekunde** los (12 je Minute, 24 Aufrufe) —
-ein Fünftel Abstand — bei einer Parallelität von **6**. Bei rund 40 s je Analyse
-bremst die Parallelität (0,15 je Sekunde), die Rate erst unter 30 s. Der
+ein Fünftel Abstand — bei einer Parallelität von **15** (seit 01.11.2026). Bei
+rund 40 s je Analyse (Large 3, wieder seit 19.11.2026) bremst die Rate; im
+Mittel laufen dann rund 8 Analysen zugleich. Der
 Anfangsschub (die Queue lässt bis zu 10 Aufträge sofort durch) kann kurz an die
 Grenze stoßen. Lehnt Mistral trotzdem ab, wartet der Auftrag und versucht es
 erneut (Abschnitt „Mistral überlastet“); Ablehnungen sind dadurch längere
@@ -572,10 +573,12 @@ drei Minuten. Die Nachrechnung mit den Daten dieses Tages ergab für 4 und 0,1
 einen Median um 60 s, im Mittel 2 Ablehnungen, die das Netz auffängt, und
 keine gescheiterte Analyse — daher ab 16.09.2026 wieder 4. Am 31.10.2026
 lief ein Lasttest mit 8 gleichzeitig durch (30 von 30 in 145 s, keine
-Ablehnung, zuletzt 5 von 30 Aufrufen frei); gewählt wurden 6 mit Abstand. Mit
-Large 4 gelten 15 gleichzeitig: Lasttest am 31.10.2026 mit 30 Fotos, 30 von 30
-fertig in rund vier Minuten, 30 von 30 mit Werbeliste; mit 30 gleichzeitig
-scheiterten 3 von 30.
+Ablehnung, zuletzt 5 von 30 Aufrufen frei); gewählt wurden 6 mit Abstand. Seit
+dem Wechsel auf Large 4 am 01.11.2026 stehen 15 gleichzeitig (Lasttest am
+31.10.2026 mit 30 Fotos, 30 von 30 fertig in rund vier Minuten, 30 von 30 mit
+Werbeliste; mit 30 gleichzeitig scheiterten 3 von 30). Die 15 bleiben seit der
+Rückkehr auf Large 3 am 19.11.2026 stehen, weil die Rate bremst und der Satz so
+für beide Modelle gilt (Abschnitt 3c).
 Rückweg: `git revert` der Änderung, dann `node scripts/betriebsprofil-anlegen.js
 --ausfuehren --ueberschreiben`.
 
@@ -589,6 +592,62 @@ Der Prompt-Zwischenspeicher ist fest eingebaut (docs/FLAGS.md): reine
 Kostenmaßnahme ohne Einfluss auf Modell, Ergebnis oder Durchsatz. Ein Verdacht,
 dass er an einer Störung beteiligt ist, wird über einen Functions-Rollback
 (Hebel 4) geklärt, nicht über einen Schalter.
+
+### 3c. Mistral-Modell wechseln (seit 19.11.2026)
+
+**Wann:** Das eingestellte Modell ist bei Mistral dauerhaft langsam oder fällt
+aus, und das andere erlaubte Modell ist nachweislich besser. Anlass war der
+18.11.2026: Large 4 brauchte im Median 184 s je Analyse (vorher rund 120 s), 23
+Analysen liefen in die Zeitgrenze, 15 von 82 scheiterten. Der Vergleich am
+19.11.2026 (Café-Demofoto, je drei Läufe gleichzeitig): Large 3 37 bis 39 s,
+Large 4 140 bis 188 s, Ergebnis gleichwertig. Large 4 traf in der Messung vom
+31.10.2026 das Alter Erwachsener besser — das ist der Preis eines Wechsels
+auf Large 3.
+
+**Was verknüpft ist:** Erlaubt sind genau die Modelle in
+`MODELL_EINSTELLUNGEN` (`functions/src/config.js`): `mistral-large-2512`
+(Large 3) und `mistral-large-4` (Large 4). Jedes bringt dort seine eigenen
+Grenzen mit — wie lange ein Analyse-Aufruf laufen darf (`analyseZeitgrenzeMs`,
+Large 3 300 s, Large 4 200 s mit einem zweiten Versuch), wie viel Text es
+mindestens braucht (`mindestAusgabeToken`), die Grenzen des Werbe-Aufrufs und
+der Nachdenk-Zusatz von Large 4. Der Einstellungssatz in Firestore hält Werte,
+die für beide passen; das prüft `betriebsprofil-kopplung.test.js` am
+produktiven Satz. Beim Lesen aus Firestore prüft `betriebsprofil-kopplung.js`
+den Satz zusätzlich gegen das eingestellte Modell und lehnt ihn ab, wenn er dem
+Modell zu wenig Text erlaubt — dann meldet sich die satzWache.
+
+**Schritte (rund 15 Minuten Arbeit, auf Large 4 rund eine Stunde wegen des Testsatzes, dann die Auslieferung):**
+1. In `functions/src/config.js` die Zeile `const MISTRAL_MODEL = …` auf das
+   andere Modell setzen, Begründung mit Messung in den Kommentar darüber.
+2. `functions/src/__tests__/config.test.js` (Erwartung des Modellnamens) und
+   die Doku mitziehen: AGENTS.md, SECURITY.md, docs/ARCHITECTURE.md,
+   docs/SETUP.md (Modell und Kostenbeispiel), CHANGELOG.
+3. `cd functions && npm test` — die Prüfung „Modell und Einstellungssatz
+   passen zusammen“ muss grün sein. Firestore wird nicht angefasst: Der
+   produktive Satz passt zu beiden Modellen. Der TESTSATZ
+   (`functions/src/test-satz.js`, 300000 ms und 5000 Token) passt dagegen nur
+   zu Large 3 — beim Wechsel auf Large 4 lehnt die Prüfung ihn ab, und rund 56
+   Tests werden rot (Abnahme 19.11.2026). Dann im Testsatz
+   `singleLargeMaxTokens` auf mindestens 16000 und `singleLargeTimeoutMs` auf
+   mindestens 410000 heben (die Kopplung verlangt 16000 Token bei 39,4 Token/s)
+   und die rund 14 Tests nachziehen, die mit den alten Testzahlen rechnen.
+   Bewusst so gelassen: Diese Tests heute umzustellen, brächte dem Betrieb
+   nichts, und der Testsatz soll ohnehin andere Zahlen tragen als die Produktion.
+4. Auslieferung mit der Kette (`docs/handover/auslieferung.sh`).
+5. Danach eine echte Analyse (`sh scripts/lasttest-live.sh 1`) und im Protokoll
+   nachsehen, welches Modell rechnete:
+
+       gcloud logging read 'jsonPayload.step="mistral-single-large-details"' \
+         --project=malzime --bucket=betrieb-eu --location=europe-west1 --view=_AllLogs --freshness=1h \
+         --format='value(timestamp,jsonPayload.model,jsonPayload.status)'
+
+**Nicht anfassen:** die Rechtstexte nennen nur „Mistral Large, in der EU“ und
+gelten für beide Modelle; die Zusage, dass Mistral nichts speichert, gilt für
+die ganze Organisation. Ein drittes Modell braucht vorher eine eigene Messung,
+einen Eintrag in `MODELL_EINSTELLUNGEN` und die Prüfung der Rechtstexte.
+
+**Frist:** Mistral schaltet Large 3 am 30.04.2027 ab. Bis dahin muss ein
+Nachfolger gemessen und eingestellt sein.
 
 ### 4. Functions-Rollback auf einen früheren Stand (~2 min)
 
@@ -1006,7 +1065,13 @@ Scheitert das Laden des Fotos endgültig, steht eine Warnung mit
 `step: "bild-laden"` (Feld `fehler`) im Protokoll. Wie oft Abrisse vorkommen:
 
     gcloud logging read 'jsonPayload.status="abbruch-neuversuch"' \
-      --project=malzime --bucket=betrieb-eu --location=europe-west1 --view=_AllLogs --freshness=1d --format='value(timestamp,jsonPayload.ursache.code,jsonPayload.ursache.text)'
+      --project=malzime --bucket=betrieb-eu --location=europe-west1 --view=_AllLogs --freshness=1d --format='value(timestamp,jsonPayload.error,jsonPayload.ursache.code,jsonPayload.ursache.text)'
+
+Steht in `error` „Mistral request timeout after 200000ms“, ist die Verbindung
+nicht abgerissen, sondern Mistral hat in der Zeitgrenze nicht geantwortet (den
+Neuversuch danach gibt es nur bei Large 4). So am 18.11.2026: 23 solche Zeilen,
+keine einzige mit Grund — Mistral war langsam. Dann hilft Abschnitt 3c
+(Mistral-Modell wechseln).
 
 (Beide Abfragen sehen einen Tag zurück. Weiter zurück geht es bis zur
 Aufbewahrung des Betriebs-Speichers, etwa mit `--freshness=7d` — Dauer: Tabelle in

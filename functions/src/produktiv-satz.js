@@ -27,12 +27,16 @@
    Kommentare an den Stellen, wo die Begründung nicht offensichtlich ist. */
 const T1_NORMAL = {
   mistralTimeoutMs: 90000,
-  /* 410 s: 16000 Token bei der langsamsten je gemessenen Geschwindigkeit
-     (39,4 Token/s). Die Kopplung verlangt das. Large 4 selbst bricht frueher ab
-     (analyseZeitgrenzeMs in config.js) und versucht es ein zweites Mal. */
+  /* GILT FUER JEDES ERLAUBTE MODELL (seit 19.11.2026, config.js
+     MODELL_EINSTELLUNGEN). Die Textmenge reicht dem Modell, das am meisten
+     braucht (Large 4: Das Nachdenken zaehlt zu den Antwort-Token, 31.10.2026
+     rund 10.500 je Analyse, Spitze 15.500); Large 3 braucht rund 2.800. Die
+     410 s verlangt die Kopplung fuer 16000 Token bei der langsamsten je
+     gemessenen Geschwindigkeit (39,4 Token/s). Tatsaechlich bricht jedes Modell
+     an seiner eigenen, kleineren Grenze ab (Large 3 300 s, Large 4 200 s mit
+     einem zweiten Versuch). So wechselt das Modell mit einer Zeile in
+     config.js, ohne dass dieser Satz in Firestore angefasst werden muss. */
   singleLargeTimeoutMs: 410000,
-  /* 16000 seit dem Wechsel auf Large 4: Das Nachdenken zaehlt zu den
-     Antwort-Token (gemessen 31.10.2026 rund 10.500 je Analyse, Spitze 15.500). */
   singleLargeMaxTokens: 16000,
   requestBudgetMs: 480000,
 
@@ -60,10 +64,12 @@ const T1_NORMAL = {
      dann `node scripts/betriebsprofil-anlegen.js --ausfuehren --ueberschreiben`
      (die vier Felder parallelitaet, queueRatePerSekunde, drosselMaxParallel,
      tokenAbstandGrossMs zusammen, in beiden Profilen). */
-  /* 15 mit Large 4 (Lasttest 31.10.2026: 30 von 30 fertig in 3:46 min, keine
-     Ablehnung; mit 30 zugleich scheiterten 3 von 30). Grenze laut Kopfzeile:
-     2000 Aufrufe je Minute (Large 4). Die 30 weiter unten gelten fuer Large 3.
-     maxInstances von processJob in index.js muss mitgehen. */
+  /* 15 seit 01.11.2026 (Lasttest mit Large 4 am 31.10.2026: 30 von 30 fertig
+     in 3:46 min, keine Ablehnung; mit 30 zugleich scheiterten 3 von 30).
+     Bleibt auch mit Large 3 (seit 19.11.2026): Die Bremse gegen Mistrals
+     Grenze ist queueRatePerSekunde unten, nicht diese Zahl. Bei 0,2 je
+     Sekunde und rund 40 s je Large-3-Analyse laufen im Mittel rund 8
+     zugleich. maxInstances von processJob in index.js muss mitgehen. */
   parallelitaet: 15,
 
   /* DIE GLOBALE BREMSE. Sie wird von der `satzWache` in die echte

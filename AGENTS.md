@@ -222,7 +222,7 @@ Einzelbefehle:
 ## Mistral-Architektur (seit v1.6.0)
 
 Die komplette KI-Pipeline laeuft ueber Mistral AI, in genau einem Weg:
-`runSingleLargeCall` in `mistral.js` schickt das Bild EINMAL an Mistral Large 4 (`mistral-large-4`, Nachdenk-Stufe `low`)
+`runSingleLargeCall` in `mistral.js` schickt das Bild EINMAL an Mistral Large 3 (`mistral-large-2512`; seit 19.11.2026 wieder, Large 4 steht als Rückweg im Code, Wechsel: docs/RUNBOOK.md „Mistral-Modell wechseln“)
 und erhaelt Beschreibung + beide Profile (Normal + Beast) in einer Antwort. Laeuft im
 Queue-Worker `handle-process-job.js`; SUBJECT-Klassifikation + Privacy-Risks werden
 aus den `subject`/`visible_text`-Feldern der Antwort abgeleitet. Der Auftrag endet

@@ -66,10 +66,24 @@ const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 const ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 
 /* ── Mistral-Modell ──
-   Ein Modell fuer alles: mistral-large-4 (Large 4, multimodal). Es liefert
+   Ein Modell fuer alles: mistral-large-2512 (Large 3, multimodal). Es liefert
    Bildbeschreibung und beide Profile in einem Aufruf und schreibt in einem
    zweiten Aufruf ohne Bild die Beast-Werbung. Das kleinere mistral-small-2603
    lief bis 10.09.2026 im ausgebauten Drei-Aufruf-Weg.
+
+   ZURUECK AUF LARGE 3 SEIT 19.11.2026 (Entscheidung Christoph). Vom 01.11. bis
+   19.11.2026 rechnete mistral-large-4. Ab 17.11. wurde Large 4 bei Mistral
+   langsam: Median einer fertigen Analyse 184 s am 18.11. (vorher rund 120 s),
+   23 Neuversuche nach der Zeitgrenze von 200 s, 15 von 82 Analysen
+   gescheitert. Vergleich am 19.11.2026 20:04-20:13, Cafe-Demofoto, je drei
+   Laeufe gleichzeitig: Large 3 37/37/39 s (rund 2.800 Ausgabe-Token), Large 4
+   188/183/140 s (9.500-12.100 Token, das Nachdenken); Alter und Vollstaendigkeit
+   gleich. Preis: Large 4 traf das Alter Erwachsener in der Messung vom
+   31.10.2026 besser. Large 3 wird am 30.04.2027 abgeschaltet — vorher muss
+   ein Nachfolger gemessen und eingestellt sein. Die Einstellungen fuer Large 4
+   bleiben unten stehen; der Rueckweg ist die Zeile MISTRAL_MODEL, alles
+   Modellabhaengige wechselt mit; fuer Large 4 muss zusaetzlich der Testsatz
+   mit (docs/RUNBOOK.md, „Mistral-Modell wechseln“).
 
    Preis pro 1M Tokens (Stand 2026-05): $0.50 / $1.50 in/out.
 
@@ -90,18 +104,47 @@ const ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp", "image/gif"];
    umlenken, deren Konditionen wir nicht kennen. Mit dem Pin kontrollieren
    wir Versions-Wechsel selbst. (Zu Rate-Limits: Stufen-System, s. oben.) */
 /* BLEIBT IM CODE — Zusage an die Nutzer.
-   WELCHES Modell rechnet, steht auf der Website und in den Rechtstexten.
-   Zur Laufzeit umschaltbar hiesse: Die Analyse liefe still ein anderes
-   Modell, waehrend die Seite weiter das alte nennt. */
-const MISTRAL_MODEL = "mistral-large-4";
+   WELCHES Modell rechnet, steht in Doku und Echtheitsnachweis (Website und
+   Rechtstexte nennen „Mistral Large, in der EU“, das deckt Large 3 und
+   Large 4). Zur Laufzeit umschaltbar hiesse: Die Analyse liefe still ein
+   anderes Modell, ohne dass der ausgelieferte Code es zeigt. Ein Schalter in
+   Firestore ist gewuenscht (Christoph, 19.11.2026) und als eigene Aenderung
+   vorgesehen: Er darf nur zwischen ERLAUBTE_MODELLE waehlen und muss im
+   Protokoll jeder Analyse zeigen, welches Modell rechnete. Bis dahin ist der
+   Wechsel diese eine Zeile. */
+const MISTRAL_MODEL = "mistral-large-2512";
 /* BLEIBT IM CODE — was je Modell am Aufruf anders ist, an einer Stelle.
    Large 4 denkt vor jeder Antwort nach, und das Nachdenken zaehlt zu den
    Antwort-Token. Die kleinste Stufe ist seit Oktober 2026 "low"; "none" lehnt
    Mistral ab (gemessen 31.10.2026, HTTP 400). Deshalb braucht der kleine
    Werbe-Aufruf dort mehr Platz: Bei 600 Token brach er in 13 von 42 Laeufen ab.
-   Ein unbekanntes Modell bekommt nichts dazu: Der Aufruf bleibt wie bisher. */
+   Ein unbekanntes Modell bekommt nichts dazu: Der Aufruf bleibt wie bisher.
+
+   MODELL UND WERTE SIND VERKNUEPFT (19.11.2026, Vorgabe Christoph: „Da
+   vergessen wir wieder irgendetwas“). Was vom Modell abhaengt, steht HIER und
+   wechselt mit der Zeile MISTRAL_MODEL oben von selbst mit:
+     analyseZeitgrenzeMs  wie lange ein Analyse-Aufruf dieses Modells laufen
+                          darf (der kleinere Wert aus diesem und
+                          singleLargeTimeoutMs im Einstellungssatz gilt)
+     mindestAusgabeToken  so viel Text muss der Einstellungssatz diesem Modell
+                          mindestens erlauben (singleLargeMaxTokens)
+   Der Einstellungssatz in Firestore haelt Werte, die fuer JEDES Modell hier
+   passen; das prueft betriebsprofil-kopplung.test.js am produktiven Satz.
+   Beim Lesen aus Firestore prueft betriebsprofil-kopplung.js den Satz gegen
+   das gerade eingestellte Modell und lehnt ihn ab, wenn er nicht passt — dann
+   meldet sich die satzWache, statt dass Antworten still abgeschnitten werden.
+   Gleichzeitige Analysen und Warteschlangen-Rate bleiben modellunabhaengig:
+   Die Bremse ist Mistrals Grenze je Minute (produktiv-satz.js). */
 const MODELL_EINSTELLUNGEN = {
-  "mistral-large-2512": { aufrufZusatz: {}, werbeMaxTokens: 600, werbeZeitgrenzeMs: 30_000 },
+  /* 300 s und 5000 Token: die Werte, mit denen Large 3 bis 01.11.2026 lief
+     (rund 2.800 Ausgabe-Token je Analyse, gemessen 19.11.2026). */
+  "mistral-large-2512": {
+    aufrufZusatz: {},
+    werbeMaxTokens: 600,
+    werbeZeitgrenzeMs: 30_000,
+    analyseZeitgrenzeMs: 300_000,
+    mindestAusgabeToken: 5000,
+  },
   /* Lasttest 31.10.2026, 30 zugleich: Fertige Analysen brauchten bis 170 s, zwei
      hingen bis zur Zeitgrenze von 280 s, dieselben Fotos liefen sonst durch.
      Darum 200 s und ein zweiter Versuch statt langem Warten. Die Werbung lief
@@ -112,8 +155,13 @@ const MODELL_EINSTELLUNGEN = {
     werbeZeitgrenzeMs: 45_000,
     analyseZeitgrenzeMs: 200_000,
     neuversuchBeiZeitgrenze: true,
+    /* Das Nachdenken zaehlt zu den Antwort-Token: 31.10.2026 rund 10.500 je
+       Analyse, Spitze 15.500; 19.11.2026 bis 12.100. */
+    mindestAusgabeToken: 16000,
   },
 };
+/* Die erlaubten Modelle — genau die mit eigenen Einstellungen oben. */
+const ERLAUBTE_MODELLE = Object.freeze(Object.keys(MODELL_EINSTELLUNGEN));
 const modellEinstellungen = (modell) => MODELL_EINSTELLUNGEN[modell] || MODELL_EINSTELLUNGEN["mistral-large-2512"];
 /* v3.0.4 (User-Freigabe 2026-08-11 abends): EU-Regional-Endpunkt statt des
    globalen — Mistral sichert damit VERTRAGLICH zu, dass die Inferenz in
@@ -334,6 +382,7 @@ module.exports = {
   ALLOWED_MIME,
   MISTRAL_MODEL,
   modellEinstellungen,
+  ERLAUBTE_MODELLE,
   MISTRAL_ENDPOINT,
   MISTRAL_SLOWEST_TOKENS_PER_SECOND,
   QUEUE_NAME,

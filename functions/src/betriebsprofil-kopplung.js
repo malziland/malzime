@@ -14,7 +14,7 @@
  */
 
 /* Das gemessene Schreibtempo der KI — ein Messergebnis, kein Sollwert. */
-const { MISTRAL_SLOWEST_TOKENS_PER_SECOND } = require("./config");
+const { MISTRAL_SLOWEST_TOKENS_PER_SECOND, MISTRAL_MODEL, modellEinstellungen } = require("./config");
 
 /* Obergrenze, die Google der Function gibt. Kein Profil darf darueber. */
 const FUNCTION_LIMIT_MS = 540 * 1000;
@@ -55,6 +55,10 @@ function pruefeKopplungen(werte) {
       `${MISTRAL_SLOWEST_TOKENS_PER_SECOND} Token/s ${Math.round(brauchtSekunden)} s, ` +
       `singleLargeTimeoutMs erlaubt aber nur ${Math.round(werte.singleLargeTimeoutMs / 1000)} s`
     );
+  }
+  const mindest = modellEinstellungen(MISTRAL_MODEL).mindestAusgabeToken;
+  if (mindest && werte.singleLargeMaxTokens < mindest) {
+    return `singleLargeMaxTokens (${werte.singleLargeMaxTokens}) ist fuer ${MISTRAL_MODEL} zu klein — das Modell braucht mindestens ${mindest} (config.js, MODELL_EINSTELLUNGEN)`;
   }
   /* Jede Einzelgrenze unter dem Gesamtbudget. */
   for (const name of ["mistralTimeoutMs", "singleLargeTimeoutMs"]) {

@@ -13,7 +13,7 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   18.11. scheiterte fast jede fünfte Analyse an der Zeitgrenze. Im Vergleich am
   19.11. brauchte Large 3 rund 40 Sekunden, Large 4 rund drei Minuten, bei gleich
   guten Ergebnissen. Large 4 schätzte das Alter Erwachsener etwas genauer.
-- **Ein Wechsel des KI-Modells ist jetzt eine einzige Zeile.** Zeitgrenze und
+- **Ein Wechsel des KI-Modells ist im Betrieb jetzt eine einzige Zeile.** Zeitgrenze und
   Textmenge hängen am Modell und wechseln mit; eine Prüfung lehnt Einstellungen ab,
   die nicht zum Modell passen.
 - **Die Nachricht bei gehäuften Neuversuchen heißt jetzt „Mistral bricht ab oder

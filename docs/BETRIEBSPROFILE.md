@@ -58,7 +58,7 @@ abgelehnt — es gibt nichts, womit sich das fehlende Feld ersetzen ließe.
 
 | Feld | heute | Bedeutung |
 |---|---|---|
-| `singleLargeTimeoutMs` | 410000 | Wie lange ein Analyse-Aufruf dauern darf |
+| `singleLargeTimeoutMs` | 410000 | Obergrenze für einen Analyse-Aufruf; jedes Modell hat eine eigene, kleinere (`config.js`, `MODELL_EINSTELLUNGEN`: Large 3 300 s, Large 4 200 s) |
 | `singleLargeMaxTokens` | 16000 | Wie viel Text die KI ausgeben darf |
 | `mistralTimeoutMs` | 90000 | Zeitgrenze der übrigen Aufrufe |
 | `requestBudgetMs` | 480000 | Gesamtbudget eines Durchlaufs |

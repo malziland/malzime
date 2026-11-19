@@ -616,14 +616,23 @@ produktiven Satz. Beim Lesen aus Firestore prüft `betriebsprofil-kopplung.js`
 den Satz zusätzlich gegen das eingestellte Modell und lehnt ihn ab, wenn er dem
 Modell zu wenig Text erlaubt — dann meldet sich die satzWache.
 
-**Schritte (rund 15 Minuten Arbeit, dann die Auslieferung):**
+**Schritte (rund 15 Minuten Arbeit, auf Large 4 rund eine Stunde wegen des Testsatzes, dann die Auslieferung):**
 1. In `functions/src/config.js` die Zeile `const MISTRAL_MODEL = …` auf das
    andere Modell setzen, Begründung mit Messung in den Kommentar darüber.
 2. `functions/src/__tests__/config.test.js` (Erwartung des Modellnamens) und
    die Doku mitziehen: AGENTS.md, SECURITY.md, docs/ARCHITECTURE.md,
    docs/SETUP.md (Modell und Kostenbeispiel), CHANGELOG.
 3. `cd functions && npm test` — die Prüfung „Modell und Einstellungssatz
-   passen zusammen“ muss grün sein. Firestore wird nicht angefasst.
+   passen zusammen“ muss grün sein. Firestore wird nicht angefasst: Der
+   produktive Satz passt zu beiden Modellen. Der TESTSATZ
+   (`functions/src/test-satz.js`, 300000 ms und 5000 Token) passt dagegen nur
+   zu Large 3 — beim Wechsel auf Large 4 lehnt die Prüfung ihn ab, und rund 56
+   Tests werden rot (Abnahme 19.11.2026). Dann im Testsatz
+   `singleLargeMaxTokens` auf mindestens 16000 und `singleLargeTimeoutMs` auf
+   mindestens 410000 heben (die Kopplung verlangt 16000 Token bei 39,4 Token/s)
+   und die rund 14 Tests nachziehen, die mit den alten Testzahlen rechnen.
+   Bewusst so gelassen: Diese Tests heute umzustellen, brächte dem Betrieb
+   nichts, und der Testsatz soll ohnehin andere Zahlen tragen als die Produktion.
 4. Auslieferung mit der Kette (`docs/handover/auslieferung.sh`).
 5. Danach eine echte Analyse (`sh scripts/lasttest-live.sh 1`) und im Protokoll
    nachsehen, welches Modell rechnete:

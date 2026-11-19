@@ -82,7 +82,8 @@ const ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp", "image/gif"];
    31.10.2026 besser. Large 3 wird am 30.04.2027 abgeschaltet — vorher muss
    ein Nachfolger gemessen und eingestellt sein. Die Einstellungen fuer Large 4
    bleiben unten stehen; der Rueckweg ist die Zeile MISTRAL_MODEL, alles
-   Modellabhaengige wechselt mit (docs/RUNBOOK.md, „Mistral-Modell wechseln“).
+   Modellabhaengige wechselt mit; fuer Large 4 muss zusaetzlich der Testsatz
+   mit (docs/RUNBOOK.md, „Mistral-Modell wechseln“).
 
    Preis pro 1M Tokens (Stand 2026-05): $0.50 / $1.50 in/out.
 

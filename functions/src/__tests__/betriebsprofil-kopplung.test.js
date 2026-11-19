@@ -127,11 +127,14 @@ describe("Modell und Einstellungssatz passen zusammen", () => {
 
   function pruefeMitModell(modell, werte) {
     let ergebnis;
-    jest.isolateModules(() => {
-      jest.doMock("../config", () => ({ ...jest.requireActual("../config"), MISTRAL_MODEL: modell }));
-      ergebnis = require("../betriebsprofil")._pruefe(werte);
-    });
-    jest.dontMock("../config");
+    try {
+      jest.isolateModules(() => {
+        jest.doMock("../config", () => ({ ...jest.requireActual("../config"), MISTRAL_MODEL: modell }));
+        ergebnis = require("../betriebsprofil")._pruefe(werte);
+      });
+    } finally {
+      jest.dontMock("../config");
+    }
     return ergebnis;
   }
 

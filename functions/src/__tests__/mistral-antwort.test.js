@@ -128,6 +128,7 @@ describe("modellEinstellungen — was je Modell am Aufruf anders ist", () => {
       analyseZeitgrenzeMs: 300_000,
       mindestAusgabeToken: 5000,
       dauerFaktor: 0.5,
+      tippAnlaufMs: 25000,
     });
   });
 

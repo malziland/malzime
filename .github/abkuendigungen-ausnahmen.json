@@ -14,9 +14,9 @@
   "ausnahmen": [
     {
       "muster": "The ubuntu-latest label will migrate to Ubuntu 26",
-      "grund": "GitHub stellt ubuntu-latest vom 19.10. bis 19.11.2026 selbst auf Ubuntu 26.04 um; festnageln waere Stillstand. Geprueft am 30.09.2026: Python 3.12 gibt es fuer 26.04 (actions/python-versions, versions-manifest.json), die Browser-Tests laufen im Playwright-Container unabhaengig vom Runner-Abbild, der libheif-Bau ist bewusst fest auf ubuntu-24.04. Nach der Umstellung den ersten CI-Lauf auf 26.04 ansehen; danach verschwindet der Hinweis von selbst.",
-      "eingetragen": "2026-09-30",
-      "pruefen_bis": "2026-11-20"
+      "grund": "GitHub hat ubuntu-latest auf Ubuntu 26.04 umgestellt. Nachgeprueft am 21.11.2026: Der CI-Lauf 44624286299 (main, 19.11.2026) lief in allen Jobs auf ubuntu-26.04 und ist gruen, ebenso der Nachtlauf 44900618989 (21.11.2026). Der Hinweis haengt nur noch am letzten echten Lauf von Dependabot Auto-Merge (#525, 01.11.2026, vor der Umstellung); alle spaeteren Laeufe dieses Workflows sind uebersprungen. Er verschwindet mit dem naechsten monatlichen Dependabot-Lauf Anfang Dezember. Erst-Eintrag 30.09.2026 (Python 3.12 fuer 26.04 vorhanden, libheif-Bau fest auf ubuntu-24.04).",
+      "eingetragen": "2026-11-21",
+      "pruefen_bis": "2026-12-10"
     }
   ]
 }

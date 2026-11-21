@@ -4,6 +4,15 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Sicherheit
+
+- **`fast-xml-parser` im Server auf 5.12.1** (GHSA-474x-hrwr-fgx4, „niedrig“: übermäßige
+  Rechenzeit bei unvollständigen XML-Antworten). Die Bibliothek kommt über Googles
+  Speicher-Anbindung (`firebase-admin` → `@google-cloud/storage`) und liest dort deren
+  XML-Antworten.
+
 ## [5.6.0] — 2026-11-19
 
 ### Geändert
